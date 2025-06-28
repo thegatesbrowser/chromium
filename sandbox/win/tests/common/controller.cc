@@ -251,6 +251,15 @@ bool TestRunner::AllowFileAccess(FileSemantics semantics,
           policy_->GetConfig()->AllowFileAccess(semantics, pattern));
 }
 
+bool TestRunner::AllowRegistryAccess(RegistrySemantics semantics,
+                                 const wchar_t* pattern) {
+  if (!is_init_)
+    return false;
+
+  return (SBOX_ALL_OK ==
+          policy_->GetConfig()->AllowRegistryAccess(semantics, pattern));
+}
+
 bool TestRunner::AddRuleSys32(FileSemantics semantics, const wchar_t* pattern) {
   if (!is_init_)
     return false;

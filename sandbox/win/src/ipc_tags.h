@@ -27,7 +27,9 @@ enum class IpcTag : uint32_t {
   USER_REGISTERCLASSW,
   CREATETHREAD,
   NTCREATESECTION,
-  kMaxValue = NTCREATESECTION,
+  NTCREATEKEY,
+  NTOPENKEY,
+  kMaxValue = NTOPENKEY,
 };
 
 // The number of IpcTag services that are defined.

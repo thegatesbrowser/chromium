@@ -39,6 +39,7 @@ enum InterceptorId {
   CREATE_SECTION_ID,
   // Unittests (fake Registry dispatcher):
   OPEN_KEY_ID,
+  CREATE_KEY_ID,
   INTERCEPTOR_MAX_ID
 };
 

@@ -30,6 +30,7 @@
 #include "sandbox/win/src/acl.h"
 #include "sandbox/win/src/crosscall_server.h"
 #include "sandbox/win/src/filesystem_policy.h"
+#include "sandbox/win/src/registry_policy.h"
 #include "sandbox/win/src/interception.h"
 #include "sandbox/win/src/job.h"
 #include "sandbox/win/src/policy_broker.h"
@@ -202,7 +203,7 @@ std::optional<base::span<const uint8_t>> ConfigBase::policy_span() {
     // Note: this is not policy().data_size as that relates to internal data,
     // not the entire allocated policy area.
     return base::span<const uint8_t>(reinterpret_cast<uint8_t*>(policy_.get()),
-                                     kPolMemSize);
+                               kPolMemSize);
   }
   return std::nullopt;
 }
@@ -256,6 +257,14 @@ sandbox::LowLevelPolicy* ConfigBase::PolicyMaker() {
 ResultCode ConfigBase::AllowFileAccess(FileSemantics semantics,
                                        const wchar_t* pattern) {
   if (!FileSystemPolicy::GenerateRules(pattern, semantics, PolicyMaker())) {
+    return SBOX_ERROR_BAD_PARAMS;
+  }
+  return SBOX_ALL_OK;
+}
+
+ResultCode ConfigBase::AllowRegistryAccess(RegistrySemantics semantics,
+                                           const wchar_t* pattern) {
+  if (!RegistryPolicy::GenerateRules(pattern, semantics, PolicyMaker())) {
     return SBOX_ERROR_BAD_PARAMS;
   }
   return SBOX_ALL_OK;

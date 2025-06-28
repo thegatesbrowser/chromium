@@ -21,6 +21,7 @@
 #include "sandbox/win/src/ipc_tags.h"
 #include "sandbox/win/src/process_mitigations_win32k_dispatcher.h"
 #include "sandbox/win/src/process_thread_dispatcher.h"
+#include "sandbox/win/src/registry_dispatcher.h"
 #include "sandbox/win/src/sandbox_policy_base.h"
 #include "sandbox/win/src/signed_dispatcher.h"
 
@@ -54,6 +55,15 @@ TopLevelDispatcher::TopLevelDispatcher(PolicyBase* policy) : policy_(policy) {
       }
       ipc_targets_[static_cast<size_t>(service)] =
           thread_process_dispatcher_.get();
+    }
+  }
+
+  for (IpcTag service : {IpcTag::NTCREATEKEY, IpcTag::NTOPENKEY}) {
+    if (config->NeedsIpc(service)) {
+      if (!registry_dispatcher_) {
+        registry_dispatcher_ = std::make_unique<RegistryDispatcher>(policy_);
+      }
+      ipc_targets_[static_cast<size_t>(service)] = registry_dispatcher_.get();
     }
   }
 

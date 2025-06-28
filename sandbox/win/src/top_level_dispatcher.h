@@ -46,6 +46,7 @@ class TopLevelDispatcher : public Dispatcher {
   // Dispatchers below are only created if they are needed.
   std::unique_ptr<Dispatcher> filesystem_dispatcher_;
   std::unique_ptr<Dispatcher> thread_process_dispatcher_;
+  std::unique_ptr<Dispatcher> registry_dispatcher_;
   std::unique_ptr<Dispatcher> handle_dispatcher_;
   std::unique_ptr<Dispatcher> process_mitigations_win32k_dispatcher_;
   std::unique_ptr<Dispatcher> signed_dispatcher_;

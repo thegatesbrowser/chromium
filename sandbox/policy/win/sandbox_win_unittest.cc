@@ -67,6 +67,10 @@ class TestTargetConfig : public TargetConfig {
                              const wchar_t* pattern) override {
     return SBOX_ALL_OK;
   }
+  ResultCode AllowRegistryAccess(RegistrySemantics semantics,
+                                 const wchar_t* pattern) override {
+    return SBOX_ALL_OK;
+  }
   ResultCode AllowExtraDll(const wchar_t* path) override { return SBOX_ALL_OK; }
   ResultCode SetFakeGdiInit() override { return SBOX_ALL_OK; }
   void AddDllToUnload(const wchar_t* dll_name) override {

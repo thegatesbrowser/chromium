@@ -59,6 +59,8 @@ class ConfigBase final : public TargetConfig {
   void SetJobMemoryLimit(size_t memory_limit) override;
   ResultCode AllowFileAccess(FileSemantics semantics,
                              const wchar_t* pattern) override;
+  ResultCode AllowRegistryAccess(RegistrySemantics semantics,
+                                 const wchar_t* pattern) override;
   ResultCode AllowExtraDll(const wchar_t* path) override;
   ResultCode SetFakeGdiInit() override;
   void AddDllToUnload(const wchar_t* dll_name) override;

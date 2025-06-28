@@ -34,6 +34,14 @@ enum class FileSemantics {
                    // (includes access to query the attributes of a file).
 };
 
+// Allowable semantics when an AllowRegistryAccess() rule is matched.
+enum class RegistrySemantics {
+  kAllowAny,       // Allows open or create for any kind of access that
+                   // the registry supports.
+  kAllowReadonly,  // Allows open or create with read access only
+                   // (includes access to query the attributes of a registry key).
+};
+
 // Configures sandbox policy to close a given handle or set of handles in the
 // target just before entering lockdown.
 enum class HandleToClose {
@@ -154,6 +162,23 @@ class [[clang::lto_visibility_public]] TargetConfig {
   // Note: Do not add new uses of this function - instead proxy file handles
   // into your process via normal Chrome IPC.
   [[nodiscard]] virtual ResultCode AllowFileAccess(FileSemantics semantics,
+                                                   const wchar_t* pattern) = 0;
+
+  // Adds a policy rule effective for processes spawned using this policy.
+  // Files matching `pattern` can be opened following RegistrySemantics.
+  //
+  // pattern: A specific full path or a full path with wildcard patterns.
+  //   The valid wildcards are:
+  //   '*' : Matches zero or more character. Only one in series allowed.
+  //   '?' : Matches a single character. One or more in series are allowed.
+  // Examples:
+  //   "HKEY_LOCAL_MACHINE\\Software\\*\\*\\*\\*"
+  //   "HKEY_LOCAL_MACHINE\\Software\\*\\*\\*\\*\\*"
+  //   "HKEY_LOCAL_MACHINE\\Software\\*\\*\\*\\*\\*\\*"
+  //
+  // Note: Do not add new uses of this function - instead proxy registry handles
+  // into your process via normal Chrome IPC.
+  [[nodiscard]] virtual ResultCode AllowRegistryAccess(RegistrySemantics semantics,
                                                    const wchar_t* pattern) = 0;
 
   // Adds a policy rule effective for processes spawned using this policy.
