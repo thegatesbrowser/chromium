@@ -14,7 +14,6 @@
 #include "sandbox/win/src/policy_engine_opcodes.h"
 #include "sandbox/win/src/policy_params.h"
 #include "sandbox/win/src/sandbox_types.h"
-#include "sandbox/win/src/sandbox_utils.h"
 #include "sandbox/win/src/win_utils.h"
 
 namespace {
@@ -28,25 +27,16 @@ static const uint32_t kAllowedRegFlags =
 // |access| with the new value.
 NTSTATUS TranslateMaximumAllowed(OBJECT_ATTRIBUTES* obj_attributes,
                                  DWORD* access) {
-  NtOpenKeyFunction NtOpenKey = nullptr;
-  ResolveNTFunctionPtr("NtOpenKey", &NtOpenKey);
-
-  NtCloseFunction NtClose = nullptr;
-  ResolveNTFunctionPtr("NtClose", &NtClose);
-
-  NtQueryObjectFunction NtQueryObject = nullptr;
-  ResolveNTFunctionPtr("NtQueryObject", &NtQueryObject);
-
   // Open the key.
   HANDLE handle;
-  NTSTATUS status = NtOpenKey(&handle, *access, obj_attributes);
+  NTSTATUS status = sandbox::GetNtExports()->OpenKey(&handle, *access, obj_attributes);
   if (!NT_SUCCESS(status))
     return status;
 
   OBJECT_BASIC_INFORMATION info = {0};
-  status = NtQueryObject(handle, ObjectBasicInformation, &info, sizeof(info),
+  status = sandbox::GetNtExports()->QueryObject(handle, ObjectBasicInformation, &info, sizeof(info),
                          nullptr);
-  CHECK(NT_SUCCESS(NtClose(handle)));
+  CHECK(NT_SUCCESS(sandbox::GetNtExports()->Close(handle)));
   if (!NT_SUCCESS(status))
     return status;
 
@@ -63,8 +53,6 @@ NTSTATUS NtCreateKeyInTarget(HANDLE* target_key_handle,
                              ULONG* disposition,
                              HANDLE target_process) {
   *target_key_handle = nullptr;
-  NtCreateKeyFunction NtCreateKey = nullptr;
-  ResolveNTFunctionPtr("NtCreateKey", &NtCreateKey);
 
   if (MAXIMUM_ALLOWED & desired_access) {
     NTSTATUS status = TranslateMaximumAllowed(obj_attributes, &desired_access);
@@ -74,7 +62,7 @@ NTSTATUS NtCreateKeyInTarget(HANDLE* target_key_handle,
 
   HANDLE local_handle = INVALID_HANDLE_VALUE;
   NTSTATUS status =
-      NtCreateKey(&local_handle, desired_access, obj_attributes, title_index,
+      sandbox::GetNtExports()->CreateKey(&local_handle, desired_access, obj_attributes, title_index,
                   class_name, create_options, disposition);
   if (!NT_SUCCESS(status))
     return status;
@@ -92,8 +80,6 @@ NTSTATUS NtOpenKeyInTarget(HANDLE* target_key_handle,
                            OBJECT_ATTRIBUTES* obj_attributes,
                            HANDLE target_process) {
   *target_key_handle = nullptr;
-  NtOpenKeyFunction NtOpenKey = nullptr;
-  ResolveNTFunctionPtr("NtOpenKey", &NtOpenKey);
 
   if (MAXIMUM_ALLOWED & desired_access) {
     NTSTATUS status = TranslateMaximumAllowed(obj_attributes, &desired_access);
@@ -102,7 +88,7 @@ NTSTATUS NtOpenKeyInTarget(HANDLE* target_key_handle,
   }
 
   HANDLE local_handle = INVALID_HANDLE_VALUE;
-  NTSTATUS status = NtOpenKey(&local_handle, desired_access, obj_attributes);
+  NTSTATUS status = sandbox::GetNtExports()->OpenKey(&local_handle, desired_access, obj_attributes);
 
   if (!NT_SUCCESS(status))
     return status;

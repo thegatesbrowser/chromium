@@ -33,6 +33,9 @@ struct NtExports {
   NtSignalAndWaitForSingleObjectFunction SignalAndWaitForSingleObject;
   NtUnmapViewOfSectionFunction           UnmapViewOfSection;
   NtWaitForSingleObjectFunction          WaitForSingleObject;
+  NtCreateKeyFunction                    CreateKey;
+  NtOpenKeyFunction                      OpenKey;
+  NtOpenKeyExFunction                    OpenKeyEx;
   RtlAllocateHeapFunction                RtlAllocateHeap;
   RtlAnsiStringToUnicodeStringFunction   RtlAnsiStringToUnicodeString;
   RtlCompareUnicodeStringFunction        RtlCompareUnicodeString;

@@ -126,6 +126,12 @@ bool ValidParameter(void* buffer, size_t size, RequiredAccess intent);
 // Copies data from a user buffer to our buffer. Returns the operation status.
 NTSTATUS CopyData(void* destination, const void* source, size_t bytes);
 
+// Determine full path name from object root and path.
+NTSTATUS AllocAndGetFullPath(
+  HANDLE root,
+  const wchar_t* path,
+  std::unique_ptr<wchar_t, NtAllocDeleter>* full_path);
+
 // Copies the name from an object attributes. |out_name| is a NUL terminated
 // string and |out_name_len| is the number of characters copied. |attributes|
 // is a copy of the attribute flags from |in_object|.
@@ -133,7 +139,8 @@ NTSTATUS CopyNameAndAttributes(
     const OBJECT_ATTRIBUTES* in_object,
     std::unique_ptr<wchar_t, NtAllocDeleter>* out_name,
     size_t* out_name_len,
-    uint32_t* attributes = nullptr);
+    uint32_t* attributes = nullptr,
+    HANDLE* root = nullptr);
 
 // Initializes our ntdll level heap
 bool InitHeap();

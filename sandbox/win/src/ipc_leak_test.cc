@@ -148,7 +148,6 @@ void TestNtOpenKey() {
   UNICODE_STRING path_str;
   HANDLE handle = INVALID_HANDLE_VALUE;
   OBJECT_ATTRIBUTES attr;
-  BINDNTDLL(RtlInitUnicodeString);
 
   RtlInitUnicodeString(&path_str, L"\\??\\leak");
   InitializeObjectAttributes(&attr, &path_str, OBJ_CASE_INSENSITIVE, nullptr,
@@ -176,7 +175,6 @@ void TestNtCreateKey() {
   UNICODE_STRING path_str;
   HANDLE handle = INVALID_HANDLE_VALUE;
   OBJECT_ATTRIBUTES attr;
-  BINDNTDLL(RtlInitUnicodeString);
 
   RtlInitUnicodeString(&path_str, L"\\Registry\\Machine\\BADBAD");
   InitializeObjectAttributes(&attr, &path_str, OBJ_CASE_INSENSITIVE, nullptr,
@@ -310,8 +308,7 @@ TEST(IPCTest, IPCLeak) {
   static_assert(std::size(test_data) == TESTIPC_LAST, "Not enough tests.");
   for (auto test : test_data) {
     TestRunner runner;
-    EXPECT_TRUE(runner.AddRule(TargetPolicy::SUBSYS_REGISTRY,
-                               TargetPolicy::REG_ALLOW_READONLY,
+    EXPECT_TRUE(runner.AllowRegistryAccess(sandbox::RegistrySemantics::kAllowReadonly,
                                L"HKEY_LOCAL_MACHINE\\Software\\*"));
     // There has to be a policy allocated for the child to have one to replace.
     runner.AllowFileAccess(sandbox::FileSemantics::kAllowReadonly,

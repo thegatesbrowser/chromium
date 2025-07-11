@@ -25,6 +25,12 @@ POLPARAMS_BEGIN(OpenFile)
   POLPARAM(OPENONLY)
 POLPARAMS_END(OpenFile)
 
+// Policy Parameters for reg open / create.
+POLPARAMS_BEGIN(OpenKey)
+  POLPARAM(NAME)
+  POLPARAM(ACCESS)
+POLPARAMS_END(OpenKey)
+
 // Policy parameter for name-based policies.
 POLPARAMS_BEGIN(NameBased)
   POLPARAM(NAME)

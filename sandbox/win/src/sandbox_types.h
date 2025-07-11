@@ -224,12 +224,6 @@ enum InterceptionType {
 using StartSandboxedProcessCallback =
     base::OnceCallback<void(base::Process, DWORD, int)>;
 
-// Typedefs for registry interception function pointers.
-typedef NTSTATUS (WINAPI* NtCreateKeyFunction)(
-    PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, ULONG, PUNICODE_STRING, ULONG, PVOID, ULONG*);
-typedef NTSTATUS (WINAPI* NtOpenKeyFunction)(
-    PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES);
-
 }  // namespace sandbox
 
 #endif  // SANDBOX_WIN_SRC_SANDBOX_TYPES_H_

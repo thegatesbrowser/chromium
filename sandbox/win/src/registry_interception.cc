@@ -56,11 +56,12 @@ NTSTATUS WINAPI TargetNtCreateKey(NtCreateKeyFunction orig_CreateKey,
       break;
 
     std::unique_ptr<wchar_t, NtAllocDeleter> name;
+    size_t name_len;
     uint32_t attributes = 0;
     HANDLE root_directory = 0;
-    NTSTATUS ret = AllocAndCopyName(object_attributes, &name, &attributes,
-                                    &root_directory);
-    if (!NT_SUCCESS(ret) || !name)
+    NTSTATUS ret = CopyNameAndAttributes(object_attributes, &name, &name_len,
+                                         &attributes, &root_directory);
+    if (!NT_SUCCESS(ret) || !name || !name_len)
       break;
 
     uint32_t desired_access_uint32 = desired_access;
@@ -141,10 +142,11 @@ NTSTATUS WINAPI CommonNtOpenKey(NTSTATUS status,
       break;
 
     std::unique_ptr<wchar_t, NtAllocDeleter> name;
-    uint32_t attributes;
-    HANDLE root_directory;
-    NTSTATUS ret = AllocAndCopyName(object_attributes, &name, &attributes,
-                                    &root_directory);
+    size_t name_len;
+    uint32_t attributes = 0;
+    HANDLE root_directory = 0;
+    NTSTATUS ret = CopyNameAndAttributes(object_attributes, &name, &name_len,
+                                         &attributes, &root_directory);
     if (!NT_SUCCESS(ret) || !name)
       break;
 

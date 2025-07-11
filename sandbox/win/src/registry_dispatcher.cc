@@ -4,6 +4,7 @@
 
 #include "sandbox/win/src/registry_dispatcher.h"
 
+#include <ntstatus.h>
 #include <stdint.h>
 
 #include "base/win/scoped_handle.h"
@@ -27,9 +28,11 @@ bool GetCompletePath(HANDLE root,
                      const std::wstring& name,
                      std::wstring* complete_name) {
   if (root) {
-    if (!sandbox::GetPathFromHandle(root, complete_name))
+    auto path = sandbox::GetPathFromHandle(root);
+    if (!path)
       return false;
 
+    *complete_name = path.value();
     *complete_name += L"\\";
     *complete_name += name;
   } else {
