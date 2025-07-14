@@ -33,6 +33,24 @@
 
 namespace {
 
+// Holds the information about a known registry key.
+struct KnownReservedKey {
+  const wchar_t* name;
+  HKEY key;
+};
+
+// Contains all the known registry key by name and by handle.
+const KnownReservedKey kKnownKey[] = {
+    {L"HKEY_CLASSES_ROOT", HKEY_CLASSES_ROOT},
+    {L"HKEY_CURRENT_USER", HKEY_CURRENT_USER},
+    {L"HKEY_LOCAL_MACHINE", HKEY_LOCAL_MACHINE},
+    {L"HKEY_USERS", HKEY_USERS},
+    {L"HKEY_PERFORMANCE_DATA", HKEY_PERFORMANCE_DATA},
+    {L"HKEY_PERFORMANCE_TEXT", HKEY_PERFORMANCE_TEXT},
+    {L"HKEY_PERFORMANCE_NLSTEXT", HKEY_PERFORMANCE_NLSTEXT},
+    {L"HKEY_CURRENT_CONFIG", HKEY_CURRENT_CONFIG},
+    {L"HKEY_DYN_DATA", HKEY_DYN_DATA}};
+
 NTSTATUS WrapQueryObject(HANDLE handle,
                          OBJECT_INFORMATION_CLASS info_class,
                          std::vector<uint8_t>& buffer,
@@ -79,6 +97,27 @@ bool IsPipe(const std::wstring& path) {
   std::wstring prefix = sandbox::kNTPrefix;
   prefix += L"pipe\\";
   return base::StartsWith(path, prefix, base::CompareCase::INSENSITIVE_ASCII);
+}
+
+std::optional<std::wstring> ResolveRegistryName(std::wstring name) {
+  for (size_t i = 0; i < std::size(kKnownKey); ++i) {
+    if (name.find(kKnownKey[i].name) == 0) {
+      HKEY key;
+      DWORD disposition;
+      if (ERROR_SUCCESS != ::RegCreateKeyEx(kKnownKey[i].key, L"", 0, nullptr,
+                                            0, MAXIMUM_ALLOWED, nullptr, &key,
+                                            &disposition)) {
+        return std::nullopt;
+      }
+      auto result = GetPathFromHandle(key);
+      ::RegCloseKey(key);
+      if (!result)
+        return std::nullopt;
+      result->append(name.substr(wcslen(kKnownKey[i].name)));
+      return result;
+    }
+  }
+  return std::nullopt;
 }
 
 std::optional<std::wstring> GetNtPathFromWin32Path(const std::wstring& path) {
