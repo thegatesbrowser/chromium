@@ -4,6 +4,7 @@
 
 #include "sandbox/win/src/registry_policy.h"
 
+#include <ntstatus.h>
 #include <stdint.h>
 
 #include <string>
@@ -17,6 +18,23 @@
 #include "sandbox/win/src/win_utils.h"
 
 namespace {
+
+struct ObjectAttribs : public OBJECT_ATTRIBUTES {
+  UNICODE_STRING uni_name;
+  SECURITY_QUALITY_OF_SERVICE security_qos;
+  ObjectAttribs(const std::wstring& name, ULONG attributes) {
+    ::RtlInitUnicodeString(&uni_name, name.c_str());
+    InitializeObjectAttributes(this, &uni_name, attributes, nullptr, nullptr);
+    if (sandbox::IsPipe(name)) {
+      security_qos.Length = sizeof(security_qos);
+      security_qos.ImpersonationLevel = SecurityAnonymous;
+      // Set dynamic tracking to not capture the broker's token
+      security_qos.ContextTrackingMode = SECURITY_DYNAMIC_TRACKING;
+      security_qos.EffectiveOnly = TRUE;
+      SecurityQualityOfService = &security_qos;
+    }
+  }
+};
 
 static const uint32_t kAllowedRegFlags =
     KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS | KEY_NOTIFY | KEY_READ |
@@ -113,10 +131,11 @@ bool RegistryPolicy::GenerateRules(const wchar_t* name,
     return false;
   }
 
-  if (!ResolveRegistryName(resolved_name, &resolved_name))
+  auto resolved = ResolveRegistryName(resolved_name);
+  if (!resolved.has_value())
     return false;
 
-  name = resolved_name.c_str();
+  name = resolved.value().c_str();
 
   EvalResult result = ASK_BROKER;
 
@@ -138,16 +157,15 @@ bool RegistryPolicy::GenerateRules(const wchar_t* name,
     }
     default: {
       NOTREACHED();
-      return false;
     }
   }
 
-  if (!create.AddStringMatch(IF, OpenKey::NAME, name, CASE_INSENSITIVE) ||
+  if (!create.AddStringMatch(IF, OpenKey::NAME, name) ||
       !policy->AddRule(IpcTag::NTCREATEKEY, &create)) {
     return false;
   }
 
-  if (!open.AddStringMatch(IF, OpenKey::NAME, name, CASE_INSENSITIVE) ||
+  if (!open.AddStringMatch(IF, OpenKey::NAME, name) ||
       !policy->AddRule(IpcTag::NTOPENKEY, &open)) {
     return false;
   }
@@ -179,10 +197,7 @@ bool RegistryPolicy::CreateKeyAction(EvalResult eval_result,
     return false;
   }
 
-  UNICODE_STRING uni_name = {0};
-  OBJECT_ATTRIBUTES obj_attributes = {0};
-  InitObjectAttribs(key, attributes, root_directory, &obj_attributes, &uni_name,
-                    nullptr);
+  ObjectAttribs obj_attributes(key, attributes);
   *nt_status = NtCreateKeyInTarget(handle, desired_access, &obj_attributes,
                                    title_index, nullptr, create_options,
                                    disposition, client_info.process);
@@ -204,10 +219,7 @@ bool RegistryPolicy::OpenKeyAction(EvalResult eval_result,
     return false;
   }
 
-  UNICODE_STRING uni_name = {0};
-  OBJECT_ATTRIBUTES obj_attributes = {0};
-  InitObjectAttribs(key, attributes, root_directory, &obj_attributes, &uni_name,
-                    nullptr);
+  ObjectAttribs obj_attributes(key, attributes);
   *nt_status = NtOpenKeyInTarget(handle, desired_access, &obj_attributes,
                                  client_info.process);
   return true;
