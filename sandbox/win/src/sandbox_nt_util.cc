@@ -329,7 +329,7 @@ NTSTATUS CopyData(void* destination, const void* source, size_t bytes) {
   __try {
     GetNtExports()->memcpy(destination, source, bytes);
   } __except (EXCEPTION_EXECUTE_HANDLER) {
-    ret = (NTSTATUS)GetExceptionCode();
+    ret = static_cast<NTSTATUS>(GetExceptionCode());
   }
   return ret;
 }
@@ -380,7 +380,7 @@ NTSTATUS AllocAndGetFullPath(
       *off = L'\0';
     } while (false);
   } __except (EXCEPTION_EXECUTE_HANDLER) {
-    ret = GetExceptionCode();
+    ret = static_cast<NTSTATUS>(GetExceptionCode());
   }
   if (!NT_SUCCESS(ret) && *full_path)
     full_path->reset(nullptr);
@@ -428,7 +428,7 @@ NTSTATUS CopyNameAndAttributes(
       ret = STATUS_SUCCESS;
     } while (false);
   } __except (EXCEPTION_EXECUTE_HANDLER) {
-    ret = (NTSTATUS)GetExceptionCode();
+    ret = static_cast<NTSTATUS>(GetExceptionCode());
   }
 
   if (!NT_SUCCESS(ret) && *out_name)
