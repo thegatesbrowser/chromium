@@ -169,6 +169,12 @@ static_library("sandbox") {
     "//build/config/compiler:prevent_unsafe_narrowing",
   ]
 
+  # SANDBOX_EXPORTS=1 enables cross-exe broker/target operation: the sandbox's
+  # SANDBOX_INTERCEPT-tagged globals are exported via __declspec(dllexport),
+  # and TargetProcess uses LoadLibrary+GetProcAddress on the child's image to
+  # resolve variable addresses by name instead of assuming identical layout.
+  defines = [ "SANDBOX_EXPORTS=1" ]
+
   public_deps = [
     ":common",
     "//base",

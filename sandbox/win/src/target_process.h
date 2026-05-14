@@ -96,6 +96,12 @@ class TargetProcess {
 
  private:
   FRIEND_TEST_ALL_PREFIXES(TargetProcessTest, FilterEnvironment);
+
+  // Get the address in the child for a given variable name. When
+  // SANDBOX_EXPORTS is defined this loads the child's image and resolves the
+  // export by name; otherwise it just returns `address` (broker's own).
+  void* GetChildAddress(const char* name, const void* address);
+
   // Verify the target process looks the same as the broker process.
   ResultCode VerifySentinels();
 

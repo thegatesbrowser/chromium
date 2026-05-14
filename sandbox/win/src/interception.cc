@@ -102,6 +102,7 @@ bool InterceptionManager::AddToPatchedFunctions(
   function.interceptor_address = replacement_code_address;
 
   interceptions_.push_back(function);
+  wprintf(L"Added to patched functions: %hs\n", function_name);
   return true;
 }
 
@@ -121,6 +122,7 @@ bool InterceptionManager::AddToPatchedFunctions(
 
   interceptions_.push_back(function);
   names_used_ = true;
+  wprintf(L"Added to patched functions: %hs\n", function_name);
   return true;
 }
 
@@ -157,6 +159,7 @@ ResultCode InterceptionManager::InitializeInterceptions() {
   if (rc != SBOX_ALL_OK)
     return rc;
 
+  wprintf(L"Transferring g_interceptions to child\n");
   rc = child_->TransferVariable("g_interceptions", &remote_buffer,
                                 &g_interceptions, sizeof(g_interceptions));
   return rc;
@@ -360,6 +363,16 @@ ResultCode InterceptionManager::PatchNtdll(bool hot_patch_needed) {
     return SBOX_ALL_OK;
 
   if (hot_patch_needed) {
+#if defined(SANDBOX_EXPORTS)
+    // Make sure the interceptor functions are not stripped by the linker.
+#if defined(_WIN64)
+#pragma comment(linker, "/include:TargetNtMapViewOfSection64")
+#pragma comment(linker, "/include:TargetNtUnmapViewOfSection64")
+#else
+#pragma comment(linker, "/include:_TargetNtMapViewOfSection@44")
+#pragma comment(linker, "/include:_TargetNtUnmapViewOfSection@12")
+#endif
+#endif  // defined(SANDBOX_EXPORTS)
     ADD_NT_INTERCEPTION(NtMapViewOfSection, MAP_VIEW_OF_SECTION_ID, 44);
     ADD_NT_INTERCEPTION(NtUnmapViewOfSection, UNMAP_VIEW_OF_SECTION_ID, 12);
   }
@@ -429,24 +442,70 @@ InterceptionManager::PatchClientFunctions(DllInterceptionData* thunks,
   patch.dll_data.num_thunks = 0;
   patch.dll_data.used_bytes = offsetof(DllInterceptionData, thunks);
 
+#if defined(SANDBOX_EXPORTS)
+  // Load the child's main module locally so we can resolve interceptors by
+  // name (cross-exe broker/target case). The resolved address inside the
+  // local image is offset-translated to the child's MainModule() base.
+  // Plain LoadLibraryW (not LOAD_LIBRARY_AS_DATAFILE): GetProcAddress only
+  // walks the export table on real-image loads. The .exe has no DllMain so
+  // load-time side effects are nil.
+  char* interceptor_base = reinterpret_cast<char*>(child_->MainModule());
+  HMODULE local_interceptor = ::LoadLibraryW(child_->Name());
+#endif  // defined(SANDBOX_EXPORTS)
+
   ServiceResolverThunk thunk(child_->Process(), /*relaxed=*/true);
 
   patch.originals = {};
-  for (const auto& interception : interceptions_) {
+  for (auto interception : interceptions_) {
     if (interception.dll != kNtdllName) {
+#if defined(SANDBOX_EXPORTS)
+      if (local_interceptor) ::FreeLibrary(local_interceptor);
+#endif
       return base::unexpected(SBOX_ERROR_BAD_PARAMS);
     }
 
-    if (INTERCEPTION_SERVICE_CALL != interception.type)
+    if (INTERCEPTION_SERVICE_CALL != interception.type) {
+#if defined(SANDBOX_EXPORTS)
+      if (local_interceptor) ::FreeLibrary(local_interceptor);
+#endif
       return base::unexpected(SBOX_ERROR_BAD_PARAMS);
+    }
+
+#if defined(SANDBOX_EXPORTS)
+    // If we're patching by name rather than by direct address, resolve the
+    // interceptor symbol against the locally-loaded child image, then translate
+    // the offset into the child's address space.
+    if (!interception.interceptor_address && local_interceptor) {
+      void* local_addr = reinterpret_cast<void*>(
+          ::GetProcAddress(local_interceptor,
+                           interception.interceptor.c_str()));
+      if (!local_addr) {
+        ::FreeLibrary(local_interceptor);
+        return base::unexpected(SBOX_ERROR_CANNOT_RESOLVE_INTERCEPTION_THUNK);
+      }
+      size_t off = static_cast<size_t>(
+          reinterpret_cast<char*>(local_addr) -
+          reinterpret_cast<char*>(local_interceptor));
+      interception.interceptor_address = interceptor_base + off;
+    }
+#endif
 
     NTSTATUS ret = thunk.Setup(
-        ntdll_base, nullptr, interception.function.c_str(),
+        ntdll_base,
+#if defined(SANDBOX_EXPORTS)
+        interceptor_base,
+#else
+        nullptr,
+#endif
+        interception.function.c_str(),
         interception.interceptor.c_str(), interception.interceptor_address,
         &thunks->thunks[patch.dll_data.num_thunks],
         thunk_bytes - patch.dll_data.used_bytes, nullptr);
     if (!NT_SUCCESS(ret)) {
       ::SetLastError(GetLastErrorFromNtStatus(ret));
+#if defined(SANDBOX_EXPORTS)
+      if (local_interceptor) ::FreeLibrary(local_interceptor);
+#endif
       return base::unexpected(SBOX_ERROR_CANNOT_SETUP_INTERCEPTION_THUNK);
     }
 
@@ -458,6 +517,9 @@ InterceptionManager::PatchClientFunctions(DllInterceptionData* thunks,
     patch.dll_data.used_bytes += sizeof(ThunkData);
   }
 
+#if defined(SANDBOX_EXPORTS)
+  if (local_interceptor) ::FreeLibrary(local_interceptor);
+#endif
   return patch;
 }
 

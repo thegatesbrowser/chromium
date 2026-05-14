@@ -227,13 +227,41 @@ ResultCode TargetProcess::Create(
     return SBOX_ERROR_CANNOT_FIND_BASE_ADDRESS;
   }
 
+#if !defined(SANDBOX_EXPORTS)
   if (base_address_ != CURRENT_MODULE()) {
     ::TerminateProcess(process_info.process_handle(), 0);
     return SBOX_ERROR_INVALID_TARGET_BASE_ADDRESS;
   }
+#endif
 
   sandbox_process_info_.Set(process_info.Take());
   return SBOX_ALL_OK;
+}
+
+void* TargetProcess::GetChildAddress(const char* name, const void* address) {
+#if defined(SANDBOX_EXPORTS)
+  // Plain LoadLibraryW on the child .exe: GetProcAddress only resolves
+  // exports when the image is loaded as an image (not LOAD_LIBRARY_AS_DATAFILE
+  // or AS_IMAGE_RESOURCE — those map the bytes but the loader doesn't build
+  // an export table walk). The .exe has no DllMain so no init runs.
+  HMODULE module = ::LoadLibraryW(exe_name_.get());
+  if (!module)
+    return nullptr;
+
+  void* child_addr =
+      reinterpret_cast<void*>(::GetProcAddress(module, name));
+  if (!child_addr) {
+    ::FreeLibrary(module);
+    return nullptr;
+  }
+
+  size_t offset = static_cast<size_t>(
+      reinterpret_cast<char*>(child_addr) - reinterpret_cast<char*>(module));
+  ::FreeLibrary(module);
+  return reinterpret_cast<char*>(MainModule()) + offset;
+#else
+  return const_cast<void*>(address);
+#endif
 }
 
 ResultCode TargetProcess::TransferVariable(const char* name,
@@ -243,9 +271,14 @@ ResultCode TargetProcess::TransferVariable(const char* name,
   if (!sandbox_process_info_.IsValid())
     return SBOX_ERROR_UNEXPECTED_CALL;
 
+  void* child_var = GetChildAddress(name, target_address);
+  if (!child_var) {
+    return SBOX_ERROR_CANNOT_FIND_VARIABLE_ADDRESS;
+  }
+
   SIZE_T written;
   if (!::WriteProcessMemory(sandbox_process_info_.process_handle(),
-                            target_address, local_address, size, &written)) {
+                            child_var, local_address, size, &written)) {
     return SBOX_ERROR_CANNOT_WRITE_VARIABLE_VALUE;
   }
   if (written != size)
@@ -393,18 +426,25 @@ ResultCode TargetProcess::VerifySentinels() {
   DWORD value = 0;
   SIZE_T read;
 
+  void* sentinel_start =
+      GetChildAddress("g_sentinel_value_start", &g_sentinel_value_start);
+  if (!sentinel_start)
+    return SBOX_ERROR_CANNOT_FIND_VARIABLE_ADDRESS;
   if (!::ReadProcessMemory(sandbox_process_info_.process_handle(),
-                           &g_sentinel_value_start, &value, sizeof(DWORD),
-                           &read)) {
+                           sentinel_start, &value, sizeof(DWORD), &read)) {
     return SBOX_ERROR_CANNOT_READ_SENTINEL_VALUE;
   }
   if (read != sizeof(DWORD))
     return SBOX_ERROR_INVALID_READ_SENTINEL_SIZE;
   if (value != g_sentinel_value_start)
     return SBOX_ERROR_MISMATCH_SENTINEL_VALUE;
+
+  void* sentinel_end =
+      GetChildAddress("g_sentinel_value_end", &g_sentinel_value_end);
+  if (!sentinel_end)
+    return SBOX_ERROR_CANNOT_FIND_VARIABLE_ADDRESS;
   if (!::ReadProcessMemory(sandbox_process_info_.process_handle(),
-                           &g_sentinel_value_end, &value, sizeof(DWORD),
-                           &read)) {
+                           sentinel_end, &value, sizeof(DWORD), &read)) {
     return SBOX_ERROR_CANNOT_READ_SENTINEL_VALUE;
   }
   if (read != sizeof(DWORD))
